@@ -33,7 +33,9 @@ const state = {
   isDragging: false,
   dragStart: { x: 0, y: 0 },
   cameraStart: { x: 0, y: 0 },
-  mouseWorld: { x: 0, y: 0 }
+  mouseWorld: { x: 0, y: 0 },
+  entityInterp: new Map(),
+  interpDuration: 500
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -100,6 +102,16 @@ function handleMessage(msg) {
       state.clock.tick = msg.data.tick;
       state.clock.elapsed = msg.data.elapsed;
       state.stats = msg.data.stats;
+      if (msg.data.entities) {
+        for (const e of msg.data.entities) {
+          const existing = state.entities.get(e.id);
+          if (existing) {
+            existing.health = e.health;
+            existing.status = e.status;
+          }
+        }
+        updateEntityTargets(msg.data.entities);
+      }
       updateTickDisplay();
       updateStats();
       break;
@@ -139,6 +151,7 @@ function handleMessage(msg) {
 
     case 'entity:added':
       state.entities.set(msg.data.id, msg.data);
+      updateEntityTargets([msg.data]);
       break;
 
     case 'entity:destroyed':
@@ -261,6 +274,7 @@ function applyState(s) {
     for (const e of s.entities) {
       state.entities.set(e.id, e);
     }
+    updateEntityTargets(s.entities);
   }
   updateForceOverview();
   updateStats();
@@ -342,6 +356,56 @@ function buildTerrainImage() {
 }
 
 // ═══════════════════════════════════════════════════════════
+// ENTITY INTERPOLATION
+// ═══════════════════════════════════════════════════════════
+
+function updateEntityTargets(entities) {
+  const now = performance.now();
+  for (const e of entities) {
+    const interp = state.entityInterp.get(e.id);
+    if (interp) {
+      const elapsed = now - interp.updateTime;
+      const t = Math.min(1, elapsed / state.interpDuration);
+      const s = t * t * (3 - 2 * t);
+      interp.prevX = interp.prevX + (interp.targetX - interp.prevX) * s;
+      interp.prevY = interp.prevY + (interp.targetY - interp.prevY) * s;
+      interp.targetX = e.x;
+      interp.targetY = e.y;
+      interp.updateTime = now;
+    } else {
+      state.entityInterp.set(e.id, {
+        prevX: e.x, prevY: e.y,
+        targetX: e.x, targetY: e.y,
+        updateTime: now
+      });
+    }
+  }
+  for (const [id] of state.entityInterp) {
+    if (!state.entities.has(id)) state.entityInterp.delete(id);
+  }
+}
+
+function interpolateEntities() {
+  const now = performance.now();
+  for (const [id, e] of state.entities) {
+    const interp = state.entityInterp.get(id);
+    if (!interp) {
+      state.entityInterp.set(id, {
+        prevX: e.x, prevY: e.y,
+        targetX: e.x, targetY: e.y,
+        updateTime: now
+      });
+      continue;
+    }
+    const elapsed = now - interp.updateTime;
+    const t = Math.min(1, elapsed / state.interpDuration);
+    const s = t * t * (3 - 2 * t);
+    e.x = interp.prevX + (interp.targetX - interp.prevX) * s;
+    e.y = interp.prevY + (interp.targetY - interp.prevY) * s;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
 // MAIN RENDER LOOP
 // ═══════════════════════════════════════════════════════════
 
@@ -353,6 +417,7 @@ function resizeCanvas() {
 
 function render() {
   resizeCanvas();
+  interpolateEntities();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   const cam = state.camera;
@@ -1269,10 +1334,27 @@ function startStateSync() {
       .then(r => r.json())
       .then(data => {
         if (data.entities) {
-          state.entities.clear();
+          const newIds = new Set();
           for (const e of data.entities) {
-            state.entities.set(e.id, e);
+            newIds.add(e.id);
+            const existing = state.entities.get(e.id);
+            if (existing) {
+              existing.health = e.health;
+              existing.maxHealth = e.maxHealth;
+              existing.status = e.status;
+              existing.attack = e.attack;
+              existing.defense = e.defense;
+              existing.kills = e.kills;
+              existing.destination = e.destination;
+              existing.target = e.target;
+            } else {
+              state.entities.set(e.id, e);
+            }
           }
+          for (const [id] of state.entities) {
+            if (!newIds.has(id)) state.entities.delete(id);
+          }
+          updateEntityTargets(data.entities);
         }
         if (data.stats) state.stats = data.stats;
       })

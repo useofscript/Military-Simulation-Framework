@@ -112,6 +112,8 @@ export default class Entity {
       domain: this.domain,
       alive: this.alive,
       status: this.status,
+      target: this.target,
+      destination: this.destination ? { x: this.destination.x, y: this.destination.y } : null,
       kills: this.kills,
       damageDealt: this.damageDealt,
       properties: this.properties

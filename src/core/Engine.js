@@ -187,7 +187,10 @@ export default class Engine {
       dt,
       elapsed,
       stats: { ...this.stats },
-      entitiesAlive: [...this.entities.values()].filter(e => e.alive).length
+      entitiesAlive: [...this.entities.values()].filter(e => e.alive).length,
+      entities: [...this.entities.values()].filter(e => e.alive).map(e => ({
+        id: e.id, x: e.x, y: e.y, health: e.health, status: e.status
+      }))
     });
   }
 
