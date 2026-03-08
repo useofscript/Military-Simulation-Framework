@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Military Simulation Command Center</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Top Bar -->
+    <header id="top-bar">
+      <div class="top-left">
+        <div class="logo">⬡ MILSIM</div>
+        <div id="sim-status" class="status-badge stopped">STOPPED</div>
+        <div id="tick-display">Tick: 0</div>
+        <div id="time-display">00:00:00</div>
+      </div>
+      <div class="top-center">
+        <button id="btn-start" class="cmd-btn green">▶ START</button>
+        <button id="btn-pause" class="cmd-btn yellow" disabled>⏸ PAUSE</button>
+        <button id="btn-resume" class="cmd-btn blue" disabled>▶ RESUME</button>
+        <button id="btn-stop" class="cmd-btn red" disabled>⏹ STOP</button>
+        <button id="btn-reset" class="cmd-btn gray">↻ RESET</button>
+        <div class="speed-control">
+          <label>Speed:</label>
+          <input type="range" id="speed-slider" min="0.5" max="10" step="0.5" value="1">
+          <span id="speed-value">1x</span>
+        </div>
+      </div>
+      <div class="top-right">
+        <div id="defcon-red" class="defcon-display">RED DEFCON: <span>5</span></div>
+        <div id="defcon-blue" class="defcon-display">BLUE DEFCON: <span>5</span></div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <div id="main-content">
+      <!-- Left Panel - Layer Controls & Unit List -->
+      <aside id="left-panel">
+        <div class="panel-section">
+          <h3>MAP LAYERS</h3>
+          <div class="layer-toggles">
+            <label class="layer-toggle active" data-layer="terrain">
+              <input type="checkbox" checked> <span class="dot" style="background:#4a7c59"></span> Terrain
+            </label>
+            <label class="layer-toggle active" data-layer="elevation">
+              <input type="checkbox" checked> <span class="dot" style="background:#8B7355"></span> Elevation
+            </label>
+            <label class="layer-toggle active" data-layer="water">
+              <input type="checkbox" checked> <span class="dot" style="background:#1e40af"></span> Water Bodies
+            </label>
+            <label class="layer-toggle" data-layer="grid">
+              <input type="checkbox"> <span class="dot" style="background:#666"></span> Grid Overlay
+            </label>
+            <label class="layer-toggle active" data-layer="units">
+              <input type="checkbox" checked> <span class="dot" style="background:#f59e0b"></span> Units
+            </label>
+            <label class="layer-toggle active" data-layer="features">
+              <input type="checkbox" checked> <span class="dot" style="background:#fff"></span> Cities/Bases
+            </label>
+            <label class="layer-toggle" data-layer="detection">
+              <input type="checkbox"> <span class="dot" style="background:#22d3ee"></span> Detection Ranges
+            </label>
+            <label class="layer-toggle" data-layer="ranges">
+              <input type="checkbox"> <span class="dot" style="background:#f87171"></span> Weapon Ranges
+            </label>
+            <label class="layer-toggle active" data-layer="radiation">
+              <input type="checkbox" checked> <span class="dot" style="background:#a855f7"></span> Radiation
+            </label>
+            <label class="layer-toggle active" data-layer="missiles">
+              <input type="checkbox" checked> <span class="dot" style="background:#ef4444"></span> Missiles
+            </label>
+            <label class="layer-toggle active" data-layer="effects">
+              <input type="checkbox" checked> <span class="dot" style="background:#fbbf24"></span> Combat Effects
+            </label>
+            <label class="layer-toggle active" data-layer="labels">
+              <input type="checkbox" checked> <span class="dot" style="background:#e5e7eb"></span> Labels
+            </label>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <h3>FORCE OVERVIEW</h3>
+          <div id="force-overview">
+            <div class="faction-summary" id="red-summary">
+              <div class="faction-header" style="border-color:#dc2626">
+                <span class="faction-dot" style="background:#dc2626"></span> Red Alliance
+              </div>
+              <div class="force-counts">
+                <span>🏔 Land: <b id="red-land">0</b></span>
+                <span>🌊 Sea: <b id="red-sea">0</b></span>
+                <span>✈ Air: <b id="red-air">0</b></span>
+              </div>
+            </div>
+            <div class="faction-summary" id="blue-summary">
+              <div class="faction-header" style="border-color:#2563eb">
+                <span class="faction-dot" style="background:#2563eb"></span> Blue Coalition
+              </div>
+              <div class="force-counts">
+                <span>🏔 Land: <b id="blue-land">0</b></span>
+                <span>🌊 Sea: <b id="blue-sea">0</b></span>
+                <span>✈ Air: <b id="blue-air">0</b></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <h3>STATISTICS</h3>
+          <div id="stats-panel">
+            <div>Total Entities: <b id="stat-total">0</b></div>
+            <div>Destroyed: <b id="stat-destroyed">0</b></div>
+            <div>Engagements: <b id="stat-engagements">0</b></div>
+            <div>Nuclear Strikes: <b id="stat-nukes">0</b></div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Map Canvas -->
+      <div id="map-container">
+        <canvas id="map-canvas"></canvas>
+        <div id="map-tooltip" class="tooltip hidden"></div>
+        <div id="zoom-controls">
+          <button id="btn-zoom-in">+</button>
+          <button id="btn-zoom-fit">⊡</button>
+          <button id="btn-zoom-out">−</button>
+        </div>
+        <div id="minimap-container">
+          <canvas id="minimap-canvas" width="180" height="135"></canvas>
+        </div>
+        <div id="coord-display">0, 0</div>
+      </div>
+
+      <!-- Right Panel - Events & Commander -->
+      <aside id="right-panel">
+        <div class="panel-section">
+          <h3>COMBAT LOG</h3>
+          <div class="log-filters">
+            <button class="log-filter active" data-filter="all">All</button>
+            <button class="log-filter" data-filter="combat">Combat</button>
+            <button class="log-filter" data-filter="nuclear">Nuclear</button>
+            <button class="log-filter" data-filter="commander">CMD</button>
+          </div>
+          <div id="event-log"></div>
+        </div>
+
+        <div class="panel-section">
+          <h3>COMMANDER AI</h3>
+          <div id="commander-panel">
+            <div class="commander-card">
+              <div class="commander-header red-text">Red Commander</div>
+              <div id="red-commander-status" class="commander-status">Waiting...</div>
+            </div>
+            <div class="commander-card">
+              <div class="commander-header blue-text">Blue Commander</div>
+              <div id="blue-commander-status" class="commander-status">Waiting...</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <h3>SELECTED UNIT</h3>
+          <div id="unit-detail">
+            <p class="placeholder">Click a unit on the map to inspect</p>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script src="js/app.js" type="module"></script>
+</body>
+</html>
